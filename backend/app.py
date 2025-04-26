@@ -1,15 +1,19 @@
 from flask import Flask, request, jsonify
-import os
+import os,chardet
+from toExcel_forPredictions import process_file_and_store
 from classify_utils import process_file
 from flask_cors import CORS
+from dotenv import load_dotenv
+from docx import Document
 
+load_dotenv()
 app = Flask(__name__)
 
 # Enable CORS
 CORS(app)
 
-UPLOAD_FOLDER = './uploads'
-app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+# UPLOAD_FOLDER = './uploads'
+# app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
 @app.route('/')
 def home():
@@ -28,18 +32,35 @@ def upload_file():
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
-    filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
-    file.save(filepath)
+    # filepath = os.path.join(app.config['UPLOAD_FOLDER'], file.filename)
+    # file.save(filepath)
 
     try:
-        endpoint_arn = "arn:aws:comprehend:ap-south-1:155125051066:document-classifier-endpoint/checkerrors"
-        results = process_file(endpoint_arn, filepath)
-    except ValueError as e:
-        os.remove(filepath)
-        return jsonify({"error": str(e)}), 400
+        endpoint_arn = os.getenv("ENDPOINT_ARN")
+
+        if file.filename.endswith(".docx"):
+            doc = Document(file)
+            file_content = "\n".join([p.text for p in doc.paragraphs])
+        else:
+            # Detect encoding
+            raw_data = file.read()
+            encoding_result = chardet.detect(raw_data)
+            file_encoding = encoding_result.get("encoding", "utf-8")  # Default to utf-8 if detection fails
+            file.seek(0)  # Reset file pointer
+            file_content = file.read().decode(file_encoding, errors="ignore")
+
+        results = process_file(endpoint_arn, file_content)
+        process_file_and_store(results)
+    
+    except Exception as e:
+        print("Error reading file:", str(e))
+        return jsonify({"error": "Failed to read file: " + str(e)}), 400
 
     return jsonify({"results": results})
-    # return jsonify({"message": f"File {file.filename} uploaded successfully"}), 200
 
+    
 if __name__ == '__main__':
+    print("Processing existing files before starting the server...")
+    
     app.run(debug=True)
+    

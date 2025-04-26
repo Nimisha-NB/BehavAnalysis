@@ -1,14 +1,17 @@
-import os,boto3
-from docx import Document
+import boto3,os
+# from docx import Document
 import time
+from dotenv import load_dotenv
+
+load_dotenv()
 
 # Function to classify text chunks using the AWS Comprehend custom classifier
 def classify_text_chunks(endpoint_arn, text_chunks):
     client = boto3.client(
         'comprehend',
-        aws_access_key_id="AKIASIHRMN25GGCEPQ6S",
-        aws_secret_access_key="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",
-        region_name="ap-south-1",
+        aws_access_key_id=os.getenv("AWS_ACCESS_KEY_ID"),
+        aws_secret_access_key=os.getenv("AWS_SECRET_ACCESS_KEY"),
+        region_name=os.getenv("AWS_REGION"),
     )
     results = []
 
@@ -40,15 +43,6 @@ def classify_text_chunks(endpoint_arn, text_chunks):
     
     return results
 
-# Function to read .txt files
-def read_txt_file(filepath):
-    with open(filepath, "r", encoding="utf-8") as file:
-        return file.read()
-
-# Function to read .docx files
-def read_docx_file(filepath):
-    document = Document(filepath)
-    return "\n".join([paragraph.text for paragraph in document.paragraphs])
 
 # Function to split text into manageable chunks
 def split_text_into_chunks(text, max_chunk_size=500):
@@ -67,31 +61,10 @@ def split_text_into_chunks(text, max_chunk_size=500):
     
     return chunks
 
-def process_file(endpoint_arn, file_path):
-    file_extension = os.path.splitext(file_path)[1].lower()
-    if file_extension == ".txt":
-        text = read_txt_file(file_path)
-    elif file_extension == ".docx":
-        text = read_docx_file(file_path)
-    else:
-        raise ValueError("Unsupported file format. Only .txt and .docx are supported.")
+def process_file(endpoint_arn, text):
+   
 
     text_chunks = split_text_into_chunks(text)
     print(f"Processing {len(text_chunks)} text chunks...\n")
     results = classify_text_chunks(endpoint_arn, text_chunks)
     return results
-
-# if __name__ == "__main__":
-#     endpoint_arn = "arn:aws:comprehend:ap-south-1:155125051066:document-classifier-endpoint/sairam"  # Replace with your actual endpoint ARN
-#     file_path = "(INL-1) INTEL-MSL-BELGAUM-Divya.docx"  # Replace with your .txt or .docx file path
-
-#     results = process_file(endpoint_arn, file_path)
-#     print("Classification completed.\n")
-#     print("Detailed Results:")
-#     for result in results:
-#         print("Chunk Text:")
-#         print(result["Text"])
-#         print("Predictions:")
-#         for pred in result["Predictions"]:
-#             print(f"  - {pred['Label']} ({pred['Confidence']:.2f})")
-#         print("-" * 80)
